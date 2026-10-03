@@ -4,8 +4,13 @@ def render_login_wall():
     if st.session_state.get("user_id") is not None:
         return True
 
-    st.title("🏋️RepWise Real-time GYM Coach")
-    st.markdown("### Welcome! Please enter a username to start.")
+    st.markdown(
+    "<h1 style='font-size:38px;'>🏋️ RepWise real-time GYM Coach</h1>",
+    unsafe_allow_html=True)
+
+    st.markdown(
+        "<h2 style='font-size:22px;'>Welcome! Please enter a username to start.</h2>",
+        unsafe_allow_html=True)
 
     with st.form("login_form", clear_on_submit=False):
         username = st.text_input("Name(unique)", placeholder='unique name eg. manku')
