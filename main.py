@@ -2,6 +2,7 @@ import streamlit as st
 import os
 import time
 import pandas as pd
+from google import genai
 from services.auth.login_wall import render_login_wall
 from services.state.session_defaults import initial_session_defaults
 from services.config.workout_config import EXERCISE_OPTIONS
@@ -11,6 +12,12 @@ from streamlit_webrtc import webrtc_streamer, WebRtcMode
 from services.vision.exercise_video_processor import VideoProcessorClass
 from services.tracking.metrics import sync_metrics_update
 from services.persistence.exercise_repository import get_users_exercises
+from services.coaching.llm import LLMCoach
+from services.coaching.tts import TextToSpeech
+from services.coaching.voice_pipeline import VoicePipeline, autoplay_audio
+from dotenv import load_dotenv
+
+load_dotenv()
 
 
 def main():
@@ -30,6 +37,25 @@ def main():
         return
 
     initial_session_defaults()
+
+
+    if "voice_pipeline" not in st.session_state:
+        try:
+            api_key = os.getenv("GEMINI_API_KEY")
+
+            gemini_client = genai.Client(api_key=api_key)
+
+            llm_coach = LLMCoach(gemini_client)
+            tts = TextToSpeech()
+
+            st.session_state.voice_pipeline = VoicePipeline(
+                llm_coach,
+                tts
+            )
+
+        except Exception as e:
+            st.error(f"Voice Pipeline Error: {e}")
+            st.session_state.voice_pipeline = None
 
     workout_started = st.session_state.get("workout_started", False)
 
@@ -52,7 +78,7 @@ def main():
 
             st.markdown("")
 
-            start_session_button = st.button("Start Session", width="stretch", key="start_session_button")
+            start_session_button = st.button("Start Workout", width="stretch", key="start_session_button")
 
             if start_session_button:
                 st.session_state.exercise_type = plan_exercise
@@ -64,6 +90,20 @@ def main():
                 st.session_state.last_saved_sets_completed = 0
                 st.rerun()
 
+                if st.session_state.voice_pipeline:
+                    result = st.session_state.voice_pipeline.process_event(
+                        event="workout_started",
+                        exercise=plan_exercise,
+                        metrics={}
+                    )
+                    
+                    if result:
+                        st.session_state.audio_to_play, st.session_state.coach_feedback = result
+
+                st.session_state.last_notified_sets_completed = 0
+                st.session_state.last_notified_workout_complete = False
+                st.rerun()
+
         else : 
             exercise = st.session_state.get("exercise_type")
             sets = st.session_state.get("target_sets")
@@ -71,10 +111,20 @@ def main():
 
             st.info(f"**{exercise}** -- {sets} Sets / {reps} Reps")
 
-            end_session_button = st.button("End Session", key="end_session_button", width='stretch')
+            end_session_button = st.button("End Workout", key="end_session_button", width='stretch')
 
             if end_session_button:
                 st.session_state.workout_started = False
+                
+                if st.session_state.voice_pipeline:
+                    result = st.session_state.voice_pipeline.process_event(
+                        event="workout_completed",
+                        exercise=exercise,
+                        metrics={}
+                    )
+                    if result:
+                        st.session_state.audio_to_play, st.session_state.coach_feedback = result
+                
                 st.rerun()
 
         if workout_started:
@@ -127,6 +177,15 @@ def main():
 
     st.title("RepWise real-time GYM Coach")
     st.markdown("Real-time pose detection with proactive Al voice coaching")
+
+    if st.session_state.get("audio_to_play"):
+        autoplay_audio(st.session_state.audio_to_play)
+
+    if st.session_state.get("coach_feedback"):
+        st.markdown("")
+        st.success(f"🤖 **Coach:** {st.session_state.coach_feedback}")
+
+
 
     if not workout_started:
         st.markdown(
