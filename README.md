@@ -28,7 +28,7 @@ Whether you're working out at home or in the gym, RepWise acts as your personal 
 
 📹 **Watch RepWise in Action**
 
-👉 **[Demo Video](PASTE_YOUR_VIDEO_LINK_HERE)**
+👉https://youtu.be/biS__siEPxQ
 
 ---
 
