@@ -220,7 +220,6 @@ def main():
             },
             async_processing=True
         )
-        st.write(context.state)
 
         sync_metrics_update(context)
 
